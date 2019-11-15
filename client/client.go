@@ -29,11 +29,13 @@ type Client interface {
 type client struct {
 	client         http.Client
 	spanNameFormat string
+	serviceName    string
 }
 
 // New creates a new instrumented client
 func New(funcs ...func(*client) error) (Client, error) {
 	cli := client{
+		serviceName:    os.Getenv("SERVICE_NAME"),
 		spanNameFormat: fmt.Sprintf("from %s", os.Getenv("SERVICE_NAME")),
 	}
 	for _, apply := range funcs {
@@ -102,7 +104,7 @@ func (c client) do(ctx context.Context, url, method string, funcs ...RequestOpti
 
 	// Applying "battery-included" options.
 	Header("X-Request-ID", requestid.Get(ctx))(&req)
-	UserAgent(os.Getenv("SERVICE_NAME"))(&req)
+	UserAgent(c.serviceName)(&req)
 
 	// Applying the "on-demand" options
 	for _, apply := range funcs {
