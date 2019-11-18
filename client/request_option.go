@@ -42,7 +42,7 @@ func FailOn(fm FailManager) RequestOption {
 // Timeout adds a timeout to the request
 func Timeout(duration time.Duration) RequestOption {
 	return func(req *Request) error {
-		req.timeout = duration
+		req.timeout = &duration
 		return nil
 	}
 }

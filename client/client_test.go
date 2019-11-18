@@ -196,3 +196,25 @@ func TestRetries(t *testing.T) {
 		})
 	}
 }
+
+func TestCancelable(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	server := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			<-time.After(50 * time.Millisecond)
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+
+	ch := make(chan error)
+	go func() {
+		cli, _ := client.New()
+		_, err := cli.Put(ctx, server.URL)
+		ch <- err
+	}()
+
+	cancel()
+	err := <-ch
+	if !errors.Is(err, client.ErrTimeout) {
+		t.Fatalf("expected %v got %v\n", client.ErrTimeout, err)
+	}
+}
