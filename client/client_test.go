@@ -217,5 +217,4 @@ func TestCancelable(t *testing.T) {
 	if !errors.Is(err, client.ErrTimeout) {
 		t.Fatalf("expected %v got %v\n", client.ErrTimeout, err)
 	}
-
 }

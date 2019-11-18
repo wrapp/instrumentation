@@ -64,10 +64,23 @@ type RequestOption func(*Request) error
 // Response returns the request's response.
 type Response struct {
 	StatusCode int
-	Body       io.ReadCloser
+	Body       cancelableBody
 }
 
-func (c client) try(ctx context.Context, request Request) (Response, error) {
+type cancelableBody struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (b cancelableBody) Close() error {
+	if err := b.ReadCloser.Close(); err != nil {
+		return err
+	}
+	b.cancel()
+	return nil
+}
+
+func (c client) try(ctx context.Context, request Request, cancelFunc context.CancelFunc) (Response, error) {
 	req, err := http.NewRequest(request.method, request.url, request.body)
 	if err != nil {
 		return Response{}, err
@@ -92,7 +105,10 @@ func (c client) try(ctx context.Context, request Request) (Response, error) {
 		}
 	}
 
-	return Response{Body: resp.Body, StatusCode: resp.StatusCode}, nil
+	return Response{Body: cancelableBody{
+		resp.Body,
+		cancelFunc,
+	}, StatusCode: resp.StatusCode}, nil
 }
 
 func (c client) do(ctx context.Context, url, method string, funcs ...RequestOption) (Response, error) {
@@ -121,11 +137,10 @@ func (c client) do(ctx context.Context, url, method string, funcs ...RequestOpti
 	ch := make(chan result)
 
 	cancelableCtx, cancel := context.WithTimeout(ctx, req.timeout)
-	defer cancel()
 
 	go func(tryCount uint) {
 		for {
-			resp, err := c.try(cancelableCtx, req)
+			resp, err := c.try(cancelableCtx, req, cancel)
 			if err != nil && req.maxRetry != nil && tryCount < *req.maxRetry {
 				tryCount++
 				continue
