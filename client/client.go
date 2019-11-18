@@ -54,7 +54,7 @@ type Request struct {
 	body         io.Reader
 	headers      map[string]string
 	maxRetry     *uint
-	timeout      time.Duration
+	timeout      *time.Duration
 	failManagers []FailManager
 }
 
@@ -64,7 +64,14 @@ type RequestOption func(*Request) error
 // Response returns the request's response.
 type Response struct {
 	StatusCode int
-	Body       cancelableBody
+	// When a cancel is called on a request, it closes automatically the response
+	// body, preventing the client to read it. This could happen for instance
+	// when reading a big payload on a short timeout. To prevent this, we implement
+	// a cancelableBody which would manually trigger the cancel function on the
+	// `Close` function.
+	// If the `Close` function is not called, it would be a memory leak (but it
+	// would already be the case as the body is not properly closed anyway)
+	Body cancelableBody
 }
 
 type cancelableBody struct {
@@ -111,11 +118,14 @@ func (c client) try(ctx context.Context, request Request, cancelFunc context.Can
 	}, StatusCode: resp.StatusCode}, nil
 }
 
+func noop() {
+	// noop, best op
+}
+
 func (c client) do(ctx context.Context, url, method string, funcs ...RequestOption) (Response, error) {
 	req := Request{
-		url:     url,
-		method:  method,
-		timeout: time.Second,
+		url:    url,
+		method: method,
 	}
 
 	// Applying "battery-included" options.
@@ -136,7 +146,11 @@ func (c client) do(ctx context.Context, url, method string, funcs ...RequestOpti
 
 	ch := make(chan result)
 
-	cancelableCtx, cancel := context.WithTimeout(ctx, req.timeout)
+	cancelableCtx := ctx
+	cancel := noop
+	if req.timeout != nil {
+		cancelableCtx, cancel = context.WithTimeout(ctx, *req.timeout)
+	}
 
 	go func(tryCount uint) {
 		for {
