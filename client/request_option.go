@@ -54,3 +54,13 @@ func Retry(count uint) RequestOption {
 		return nil
 	}
 }
+
+// RetryWithBackoff allows to retry the request multiple time, including an
+// exponential backoff.
+func RetryWithBackoff(count uint, backoff time.Duration) RequestOption {
+	return func(req *Request) error {
+		req.maxRetry = &count
+		req.backoffRetry = &backoff
+		return nil
+	}
+}
