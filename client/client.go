@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -54,6 +55,7 @@ type Request struct {
 	body         io.Reader
 	headers      map[string]string
 	maxRetry     *uint
+	backoffRetry *time.Duration
 	timeout      *time.Duration
 	failManagers []FailManager
 }
@@ -156,6 +158,10 @@ func (c client) do(ctx context.Context, url, method string, funcs ...RequestOpti
 		for {
 			resp, err := c.try(cancelableCtx, req, cancel)
 			if err != nil && req.maxRetry != nil && tryCount < *req.maxRetry {
+				if req.backoffRetry != nil {
+					backoff := time.Duration(math.Pow(2, float64(tryCount))-1) * *req.backoffRetry
+					<-time.After(backoff)
+				}
 				tryCount++
 				continue
 			}

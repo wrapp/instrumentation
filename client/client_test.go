@@ -218,3 +218,62 @@ func TestCancelable(t *testing.T) {
 		t.Fatalf("expected %v got %v\n", client.ErrTimeout, err)
 	}
 }
+
+func TestRetryWithBackoff(t *testing.T) {
+	ctx := context.Background()
+
+	type test struct {
+		testcase            string
+		backoff             time.Duration
+		expectedRetries     uint
+		expectedMinDuration time.Duration
+	}
+
+	tests := []test{
+		test{
+			testcase:        "no backoff should be really quick",
+			backoff:         0 * time.Millisecond,
+			expectedRetries: uint(3),
+		},
+		test{
+			testcase:            "50ms backoff with 3 retries should be at least 200ms",
+			backoff:             50 * time.Millisecond,
+			expectedRetries:     uint(3),
+			expectedMinDuration: 200 * time.Millisecond,
+		},
+		test{
+			testcase:            "50ms backoff with 4 retries should be at least 550ms",
+			backoff:             50 * time.Millisecond,
+			expectedRetries:     uint(4),
+			expectedMinDuration: 550 * time.Millisecond,
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		t.Run(test.testcase, func(t *testing.T) {
+			counter := uint(0)
+			server := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					counter++
+					w.WriteHeader(http.StatusInternalServerError)
+				}))
+
+			start := time.Now().UTC()
+			cli, _ := client.New()
+			cli.Post(ctx, server.URL,
+				client.FailOn(client.StatusChecker(errors.New("oops"),
+					http.StatusInternalServerError)),
+				client.RetryWithBackoff(test.expectedRetries, test.backoff),
+			)
+			if counter != test.expectedRetries {
+				t.Fatalf("expected %d got %d", test.expectedRetries, counter)
+			}
+
+			duration := time.Since(start)
+			if duration < test.expectedMinDuration {
+				t.Fatalf("expected %v got %v", test.expectedMinDuration, duration)
+			}
+		})
+	}
+}
