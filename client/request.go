@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"time"
 )
@@ -51,6 +52,11 @@ func Body(buffer []byte) RequestOption {
 // UserAgent adds the user-agent to the request.
 func UserAgent(ua string) RequestOption {
 	return Header("User-Agent", ua)
+}
+
+// AuthorizationBearer adds an authorization Bearer token to the request.
+func AuthorizationBearer(token string) RequestOption {
+	return Header("Authorization", fmt.Sprintf("Bearer %s", token))
 }
 
 // FailOn adds a failure manager to the request.
