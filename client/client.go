@@ -48,18 +48,6 @@ func New(funcs ...func(*client) error) (Client, error) {
 	return cli, nil
 }
 
-// Request contains the parameters of the request.
-type Request struct {
-	url          string
-	method       string
-	body         io.Reader
-	headers      map[string]string
-	maxRetry     *uint
-	backoffRetry *time.Duration
-	timeout      *time.Duration
-	failManagers []FailManager
-}
-
 // RequestOption is a function that can be injected in the request.
 type RequestOption func(*Request) error
 
@@ -103,6 +91,11 @@ func (c client) try(ctx context.Context, request Request, cancelFunc context.Can
 	c.client.Transport = &ochttp.Transport{
 		FormatSpanName: func(*http.Request) string { return c.spanNameFormat },
 	}
+
+	if request.host != nil {
+		req.Host = *request.host
+	}
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return Response{}, err

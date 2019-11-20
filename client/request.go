@@ -1,8 +1,23 @@
 package client
 
-import "bytes"
+import (
+	"bytes"
+	"io"
+	"time"
+)
 
-import "time"
+// Request contains the parameters of the request.
+type Request struct {
+	url          string
+	method       string
+	body         io.Reader
+	headers      map[string]string
+	host         *string
+	maxRetry     *uint
+	backoffRetry *time.Duration
+	timeout      *time.Duration
+	failManagers []FailManager
+}
 
 // Header adds a header to the request.
 func Header(key string, value string) RequestOption {
@@ -13,6 +28,14 @@ func Header(key string, value string) RequestOption {
 
 		req.headers[key] = value
 
+		return nil
+	}
+}
+
+// Host injects the host into the request.
+func Host(host string) RequestOption {
+	return func(req *Request) error {
+		req.host = &host
 		return nil
 	}
 }

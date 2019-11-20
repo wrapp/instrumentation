@@ -277,3 +277,22 @@ func TestRetryWithBackoff(t *testing.T) {
 		})
 	}
 }
+
+func TestHost(t *testing.T) {
+	ctx := context.Background()
+	expectedHost := "some-host"
+
+	server := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Host != expectedHost {
+				t.Fatalf("expected %v, got %v", expectedHost, r.Host)
+			}
+
+		}))
+
+	cli, _ := client.New()
+	_, err := cli.Get(ctx, server.URL, client.Host(expectedHost))
+	if err != nil {
+		t.Fatalf("got an unexpected error %v", err)
+	}
+}
