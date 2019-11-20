@@ -296,3 +296,22 @@ func TestHost(t *testing.T) {
 		t.Fatalf("got an unexpected error %v", err)
 	}
 }
+
+func TestAuthorizationBearer(t *testing.T) {
+	ctx := context.Background()
+	expectedToken := "my-token"
+
+	server := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			token := r.Header.Get("Authorization")[len("Bearer "):]
+			if token != expectedToken {
+				t.Fatalf("expected %v, got %v", expectedToken, token)
+			}
+		}))
+
+	cli, _ := client.New()
+	_, err := cli.Get(ctx, server.URL, client.AuthorizationBearer(expectedToken))
+	if err != nil {
+		t.Fatalf("got an unexpected error %v", err)
+	}
+}
