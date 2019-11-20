@@ -285,7 +285,7 @@ func TestHost(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			if r.Host != expectedHost {
-				t.Fatalf("expected %v, got %v", expectedHost, r.Host)
+				t.Fatalf("expected %v got %v", expectedHost, r.Host)
 			}
 
 		}))
@@ -305,7 +305,7 @@ func TestAuthorizationBearer(t *testing.T) {
 		func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("Authorization")[len("Bearer "):]
 			if token != expectedToken {
-				t.Fatalf("expected %v, got %v", expectedToken, token)
+				t.Fatalf("expected %v got %v", expectedToken, token)
 			}
 		}))
 
