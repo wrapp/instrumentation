@@ -26,8 +26,8 @@ func Multi(e ...Exporter) Exporter {
 type multi []Exporter
 
 func (m multi) Flush(ctx context.Context, field string, val LastSeen) error {
-	for _, o := range m {
-		err := o.Flush(ctx, field, val)
+	for _, exporter := range m {
+		err := exporter.Flush(ctx, field, val)
 		if err != nil {
 			return err
 		}
