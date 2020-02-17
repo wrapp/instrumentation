@@ -7,7 +7,10 @@ require (
 	github.com/go-redis/redis v6.15.7+incompatible
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/m4rw3r/uuid v1.0.0
+	github.com/onsi/ginkgo v1.12.0 // indirect
+	github.com/onsi/gomega v1.9.0 // indirect
 	github.com/rs/zerolog v1.17.2
+	github.com/stretchr/testify v1.4.0
 	github.com/uber/jaeger-client-go v2.20.1+incompatible // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0
 	go.opencensus.io v0.22.2

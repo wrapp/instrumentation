@@ -9,6 +9,16 @@ import (
 	"github.com/wrapp/instrumentation/logs"
 )
 
+// Tracker takes care of tracking and exporting metrics
+type Tracker interface {
+	// SetSeen records a seen timestamp for the given field
+	SetSeen(ctx context.Context, field string)
+	// GetSeen returns the unix time stamp when the given field was last tracked as seen
+	GetSeen(ctx context.Context, field string) int64
+	// Wait for all exports to finish
+	WaitForExporters()
+}
+
 // LastSeen keeps track of a last seen and its last flush time
 type LastSeen struct {
 	Value     int64
@@ -22,111 +32,121 @@ type TrackerOption func(*TrackerOptions)
 type TrackerOptions struct {
 	flushIntervalSeconds int64
 	useTicker            bool
+	exporterFactories    []ExporterFactory
 }
 
 type tracker struct {
-	seens      stateMap
-	options    TrackerOptions
-	exporterMu sync.Mutex
-	exporter   Exporter
+	seens                sync.Map
+	exporterMu           sync.Mutex
+	exporter             Exporter
+	wg                   sync.WaitGroup
+	flushIntervalSeconds int64
+	useTicker            bool
 }
 
 var (
 	once            sync.Once
-	trackerMu       sync.Mutex
-	lastSeenTracker *tracker
+	lastSeenTracker Tracker
 )
 
-// NewRedisExporter initializes a Redis exporter for last seen metrics
-func NewRedisExporter(ctx context.Context, serviceName string, host string, storeKey string, options ...TrackerOption) error {
-	once.Do(func() {
-		if host != "" {
-			opts := TrackerOptions{
-				flushIntervalSeconds: 30,
-				useTicker:            false,
-			}
-			for _, apply := range options {
-				apply(&opts)
-			}
-			if storeKey == "" {
-				storeKey = "eventbus-metrics"
-			}
-			redis, err := Redis(host, serviceName, storeKey)
-			if err != nil {
-				logs.New(ctx).Panic().Err(err).Msg("Unable create Redis last seen tracker")
-			}
-			newTrackerSingleton(ctx, opts, redis)
+// NewTrackerSingleton initializes a last seen tracker singleton
+func NewTrackerSingleton(ctx context.Context, options ...TrackerOption) (Tracker, error) {
+
+	opts := TrackerOptions{
+		flushIntervalSeconds: 30,
+		useTicker:            false,
+	}
+	for _, apply := range options {
+		apply(&opts)
+	}
+
+	var exporters []Exporter
+	for _, factory := range opts.exporterFactories {
+		exporter, err := factory()
+		if err != nil {
+			return nil, err
 		}
+		exporters = append(exporters, exporter)
+	}
+
+	once.Do(func() {
+
+		t := &tracker{
+			useTicker:            opts.useTicker,
+			flushIntervalSeconds: opts.flushIntervalSeconds,
+			exporter:             Multi(exporters...),
+		}
+
+		if opts.useTicker {
+			t.start()
+		}
+
+		lastSeenTracker = t
 	})
-	return nil
+	return lastSeenTracker, nil
 }
 
-func newTrackerSingleton(ctx context.Context, options TrackerOptions, e ...Exporter) {
-	trackerMu.Lock()
-	defer trackerMu.Unlock()
-
-	lastSeenTracker = &tracker{
-		seens:    stateMap{state: make(map[string]LastSeen)},
-		options:  options,
-		exporter: Multi(e...),
+// GetTracker gets the last seen tracker singleton
+func GetTracker() Tracker {
+	if lastSeenTracker == nil {
+		return nil
 	}
-
-	if options.useTicker {
-		lastSeenTracker.start()
-	}
+	return lastSeenTracker
 }
 
 // SetSeen updates the last seen time for the given field
-func SetSeen(ctx context.Context, field string) {
+func (t *tracker) SetSeen(ctx context.Context, field string) {
 	if lastSeenTracker == nil {
 		return
 	}
-	trackerMu.Lock()
-	defer trackerMu.Unlock()
-	lastSeenTracker.SetSeen(ctx, field)
+	t.setLastSeen(ctx, field, time.Now().Unix())
 }
 
-// Tracker takes care of tracking and exporting metrics
-type Tracker interface {
-	// SetSeen records a seen timestamp for the given field
-	SetSeen(field string)
-	// GetSeen returns the unix time stamp when the given field was last tracked as seen
-	GetSeen(field string) int64
-	// Flushes all last seen values to store
-	Flush()
+// GetSeen gets the last seen time for the given field, if it has never been set the time is 0
+func (t *tracker) GetSeen(ctx context.Context, field string) int64 {
+	if lastSeenTracker == nil {
+		return 0
+	}
+
+	if lastSeen, ok := t.getLastSeen(field); ok {
+		return lastSeen.Value
+	}
+	return 0
 }
 
-type stateMap struct {
-	sync.RWMutex
-	state map[string]LastSeen
+// WaitForExporters waits for all exporters to finish the current exports
+func (t *tracker) WaitForExporters() {
+	if lastSeenTracker == nil {
+		return
+	}
+	t.wg.Wait()
 }
 
-func (t *stateMap) SetNow(field string) {
-	t.Set(field, time.Now().Unix())
-}
-
-func (t *stateMap) Set(field string, value int64) {
-	t.Lock()
-	if sv, ok := t.state[field]; !ok {
-		t.state[field] = LastSeen{value, 0}
+func (t *tracker) setLastSeen(ctx context.Context, field string, value int64) {
+	var lastSeen LastSeen
+	if existing, ok := t.getLastSeen(field); !ok {
+		lastSeen = LastSeen{value, 0}
+	} else if existing.Value == value {
+		return // same value no need to update anything
 	} else {
-		t.state[field] = LastSeen{value, sv.LastFlush}
+		lastSeen = LastSeen{value, existing.LastFlush}
 	}
-	t.Unlock()
+	t.seens.Store(field, lastSeen)
+	// Flush directly unless we are using a timer
+	if !t.useTicker {
+		t.wg.Add(1)
+		go func(trk *tracker) {
+			defer trk.wg.Done()
+			trk.flushKey(ctx, field, lastSeen)
+		}(t)
+	}
 }
 
-func (t *stateMap) MarkFlushed(field string) {
-	t.Lock()
-	if sv, ok := t.state[field]; ok {
-		t.state[field] = LastSeen{sv.Value, sv.Value}
+func (t *tracker) getLastSeen(field string) (LastSeen, bool) {
+	if sv, ok := t.seens.Load(field); ok {
+		return sv.(LastSeen), true
 	}
-	t.Unlock()
-}
-
-func (t *stateMap) Get(field string) LastSeen {
-	t.RLock()
-	defer t.RUnlock()
-	return t.state[field]
+	return LastSeen{}, false
 }
 
 func (t *tracker) start() {
@@ -134,48 +154,41 @@ func (t *tracker) start() {
 		// run last-seen updater in background not to interfere with
 		// async flow.
 		for {
-			<-time.After(time.Duration(t.options.flushIntervalSeconds) * time.Second)
+			<-time.After(time.Duration(t.flushIntervalSeconds) * time.Second)
 			t.flushAll(context.Background())
 		}
 	}()
 }
 
-// UpdateSeen sets the last time for the given field to the current unix time
-func (t *tracker) SetSeen(ctx context.Context, field string) {
-	t.seens.SetNow(field)
-	go t.flushKey(ctx, field)
-}
-
-// Seen returns the last seen unix time for the given field.
-func (t *tracker) GetSeen(field string) int64 {
-	return t.seens.Get(field).Value
-}
-
-func (t *tracker) flushAll(ctx context.Context) {
-	for txType := range t.seens.state {
-		t.flushKey(ctx, txType)
-	}
-}
-
-func (t *tracker) flushKey(ctx context.Context, field string) {
-	sv := t.seens.Get(field)
-	diff := sv.Value - sv.LastFlush
+func (t *tracker) flushKey(ctx context.Context, field string, lastSeen LastSeen) {
+	diff := lastSeen.Value - lastSeen.LastFlush
 	if diff > 0 {
-		if diff > t.options.flushIntervalSeconds {
-			err := t.flush(ctx, field, sv)
+		if diff > t.flushIntervalSeconds {
+			//logs.New(ctx).Info().Str("type", field).Int64("lastSeen", lastSeen.Value).Int64("lastFlush", lastSeen.LastFlush).Msg("Exporting last seen")
+			// Store new flush time to prevent export of same value
+			t.seens.Store(field, LastSeen{lastSeen.Value, lastSeen.Value})
+			err := t.export(ctx, field, lastSeen)
 			if err != nil {
 				logs.New(ctx).Error().Err(err).Str("type", field).Msg("failed to flush last seen")
-			} else {
-				t.seens.MarkFlushed(field)
+				// revert flushtime
+				t.seens.Store(field, LastSeen{lastSeen.Value, lastSeen.LastFlush})
 			}
 		}
 	}
 }
 
-func (t *tracker) flush(ctx context.Context, field string, val LastSeen) error {
+func (t *tracker) flushAll(ctx context.Context) {
+	t.seens.Range(func(key, val interface{}) bool {
+		field, lastSeen := key.(string), val.(LastSeen)
+		t.flushKey(ctx, field, lastSeen)
+		return true
+	})
+}
+
+func (t *tracker) export(ctx context.Context, field string, lastSeen LastSeen) error {
 	t.exporterMu.Lock()
 	defer t.exporterMu.Unlock()
-	return t.exporter.Flush(ctx, field, val)
+	return t.exporter.Export(ctx, field, lastSeen)
 }
 
 // WithFlushIntervalSeconds specifies minimum flush interval
@@ -202,5 +215,12 @@ func WithFlushIntervalSecondsString(s string) TrackerOption {
 func WithTicker(f bool) TrackerOption {
 	return func(o *TrackerOptions) {
 		o.useTicker = f
+	}
+}
+
+// WithExporter provides an exporter factory, can be called multiple times to provide multiple exporters
+func WithExporter(f ExporterFactory) TrackerOption {
+	return func(o *TrackerOptions) {
+		o.exporterFactories = append(o.exporterFactories, f)
 	}
 }

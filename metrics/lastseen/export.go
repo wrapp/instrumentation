@@ -4,8 +4,11 @@ import "context"
 
 // Exporter defines a last seen metrics exporter
 type Exporter interface {
-	Flush(ctx context.Context, field string, val LastSeen) error
+	Export(ctx context.Context, field string, val LastSeen) error
 }
+
+// ExporterFactory defines a exporter factory method
+type ExporterFactory func() (Exporter, error)
 
 // Multi returns an exporter that invokes all the exporters given to it in order.
 func Multi(e ...Exporter) Exporter {
@@ -25,9 +28,9 @@ func Multi(e ...Exporter) Exporter {
 
 type multi []Exporter
 
-func (m multi) Flush(ctx context.Context, field string, val LastSeen) error {
+func (m multi) Export(ctx context.Context, field string, val LastSeen) error {
 	for _, exporter := range m {
-		err := exporter.Flush(ctx, field, val)
+		err := exporter.Export(ctx, field, val)
 		if err != nil {
 			return err
 		}
