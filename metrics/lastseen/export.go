@@ -1,6 +1,8 @@
 package lastseen
 
-import "context"
+import (
+	"context"
+)
 
 // Exporter defines a last seen metrics exporter
 type Exporter interface {

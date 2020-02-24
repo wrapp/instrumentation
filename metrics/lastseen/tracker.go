@@ -25,8 +25,8 @@ type LastSeen struct {
 	LastFlush int64
 }
 
-// TrackerOption defines a configuration function
-type TrackerOption func(*TrackerOptions)
+// TrackerFunc defines a configuration function
+type TrackerFunc func(*TrackerOptions)
 
 // TrackerOptions defines options for the tracker
 type TrackerOptions struct {
@@ -50,7 +50,7 @@ var (
 )
 
 // NewTrackerSingleton initializes a last seen tracker singleton
-func NewTrackerSingleton(ctx context.Context, options ...TrackerOption) (Tracker, error) {
+func NewTrackerSingleton(ctx context.Context, options ...TrackerFunc) (Tracker, error) {
 
 	opts := TrackerOptions{
 		flushIntervalSeconds: 30,
@@ -86,12 +86,20 @@ func NewTrackerSingleton(ctx context.Context, options ...TrackerOption) (Tracker
 	return lastSeenTracker, nil
 }
 
-// GetTracker gets the last seen tracker singleton
-func GetTracker() Tracker {
+// SetSeen updates the last seen time for the given field, if no tracker has been configured (with NewTrackerSingleton) nothing is tracked
+func SetSeen(ctx context.Context, field string) {
 	if lastSeenTracker == nil {
-		return nil
+		return
 	}
-	return lastSeenTracker
+	lastSeenTracker.SetSeen(ctx, field)
+}
+
+// GetTracker gets the last seen tracker singleton
+func GetTracker() (Tracker, error) {
+	if lastSeenTracker == nil {
+		return nil, ErrNoTracker
+	}
+	return lastSeenTracker, nil
 }
 
 // SetSeen updates the last seen time for the given field
@@ -164,7 +172,6 @@ func (t *tracker) flushKey(ctx context.Context, field string, lastSeen LastSeen)
 	diff := lastSeen.Value - lastSeen.LastFlush
 	if diff > 0 {
 		if diff > t.flushIntervalSeconds {
-			//logs.New(ctx).Info().Str("type", field).Int64("lastSeen", lastSeen.Value).Int64("lastFlush", lastSeen.LastFlush).Msg("Exporting last seen")
 			// Store new flush time to prevent export of same value
 			t.seens.Store(field, LastSeen{lastSeen.Value, lastSeen.Value})
 			err := t.export(ctx, field, lastSeen)
@@ -192,14 +199,14 @@ func (t *tracker) export(ctx context.Context, field string, lastSeen LastSeen) e
 }
 
 // WithFlushIntervalSeconds specifies minimum flush interval
-func WithFlushIntervalSeconds(t int64) TrackerOption {
+func WithFlushIntervalSeconds(t int64) TrackerFunc {
 	return func(o *TrackerOptions) {
 		o.flushIntervalSeconds = t
 	}
 }
 
 // WithFlushIntervalSecondsString specifies minimum flush interval with a string that will be parsed as integer
-func WithFlushIntervalSecondsString(s string) TrackerOption {
+func WithFlushIntervalSecondsString(s string) TrackerFunc {
 	return func(o *TrackerOptions) {
 		if s == "" {
 			return
@@ -212,14 +219,14 @@ func WithFlushIntervalSecondsString(s string) TrackerOption {
 }
 
 // WithTicker controls whether a timer should do flushing, otherwise the flushing happens when values updated
-func WithTicker(f bool) TrackerOption {
+func WithTicker(f bool) TrackerFunc {
 	return func(o *TrackerOptions) {
 		o.useTicker = f
 	}
 }
 
 // WithExporter provides an exporter factory, can be called multiple times to provide multiple exporters
-func WithExporter(f ExporterFactory) TrackerOption {
+func WithExporter(f ExporterFactory) TrackerFunc {
 	return func(o *TrackerOptions) {
 		o.exporterFactories = append(o.exporterFactories, f)
 	}
