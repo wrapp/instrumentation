@@ -22,6 +22,7 @@ func init() {
 // New returns a zerolog Logger.
 func New(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *zerolog.Logger {
 	log := logger.With()
+	log = log.Timestamp()
 
 	funcs = append(funcs, WithServiceName())
 	funcs = append(funcs, WithRequestID(ctx))
