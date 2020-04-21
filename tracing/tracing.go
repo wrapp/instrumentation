@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"contrib.go.opencensus.io/exporter/jaeger"
+	"github.com/wrapp/instrumentation/requestid"
 	"go.opencensus.io/trace"
 )
 
@@ -82,9 +83,9 @@ func (o SpanOptions) spanLabel() string {
 }
 
 // StartSpan creates a new span
-func StartSpan(parent context.Context, label string, funcs ...func(*SpanOptions)) (context.Context, func()) {
+func StartSpan(ctx context.Context, label string, funcs ...func(*SpanOptions)) (context.Context, func()) {
 	if !tracingEnabled {
-		return parent, func() {}
+		return ctx, func() {}
 	}
 
 	options := SpanOptions{label: label}
@@ -92,9 +93,10 @@ func StartSpan(parent context.Context, label string, funcs ...func(*SpanOptions)
 		apply(&options)
 	}
 
-	ctx, span := trace.StartSpan(parent, options.spanLabel())
+	ctx, span := trace.StartSpan(ctx, options.spanLabel())
 
-	var attributes []trace.Attribute
+	attributes := make([]trace.Attribute, 0, len(options.Int64Tags)+
+		len(options.StringTags)+1)
 	for k, v := range options.Int64Tags {
 		attributes = append(attributes, trace.Int64Attribute(k, v))
 	}
@@ -102,6 +104,9 @@ func StartSpan(parent context.Context, label string, funcs ...func(*SpanOptions)
 	for k, v := range options.StringTags {
 		attributes = append(attributes, trace.StringAttribute(k, v))
 	}
+
+	attributes = append(attributes, trace.StringAttribute("request_id",
+		requestid.Get(ctx)))
 
 	span.AddAttributes(attributes...)
 
