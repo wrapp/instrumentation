@@ -7,18 +7,29 @@ type FailManager interface {
 	Check(*http.Response) error
 }
 
+func contains(status int, statusList []int) bool {
+	for _, s := range statusList {
+		if s == status {
+			return true
+		}
+	}
+
+	return false
+}
+
+// statusChecker contains the implementation where the status are matching a given
+// list.
 type statusChecker struct {
-	statusList []int
-	raiseErr   error
+	statusList  []int
+	raiseErr    error
+	mustContain bool
 }
 
 func (checker statusChecker) Check(resp *http.Response) error {
-	for _, status := range checker.statusList {
-		if resp.StatusCode == status {
-			return checker.raiseErr
-		}
+	if contains(resp.StatusCode, checker.statusList) == checker.mustContain {
+		return nil
 	}
-	return nil
+	return checker.raiseErr
 }
 
 // StatusChecker creates a FailManager that fails when some status are returned.
@@ -34,4 +45,9 @@ func StatusBetween(err error, min, max int) FailManager {
 		invalidStatus = append(invalidStatus, i)
 	}
 	return statusChecker{raiseErr: err, statusList: invalidStatus}
+}
+
+// StatusIsNot creates a FailManager that fails if the status is not in the list.
+func StatusIsNot(err error, statusList ...int) FailManager {
+	return statusChecker{raiseErr: err, statusList: statusList, mustContain: true}
 }
