@@ -92,75 +92,55 @@ func TestBody(t *testing.T) {
 func TestFailOnStatus(t *testing.T) {
 	ctx := context.Background()
 
-	error400 := errors.New("http400")
-	error500 := errors.New("http500")
-
-	tests := []struct {
-		testcase      string
-		statusCode    int
-		expectedError error
-	}{
-		{
-			testcase:   "should not fail",
-			statusCode: http.StatusOK,
-		},
-		{
-			testcase:      "should fail with a 500 error",
-			statusCode:    http.StatusInternalServerError,
-			expectedError: error500,
-		},
-		{
-			testcase:      "should fail with a 400 error",
-			statusCode:    http.StatusBadRequest,
-			expectedError: error400,
-		},
-	}
-
-	for i := range tests {
-		test := tests[i]
-		t.Run(test.testcase, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(
-				func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(test.statusCode)
-				}))
-
-			cli, _ := client.New()
-			_, err := cli.Get(ctx, server.URL,
-				client.FailOn(client.StatusChecker(error500, http.StatusInternalServerError)),
-				client.FailOn(client.StatusChecker(error400, http.StatusBadRequest)))
-			if !errors.Is(err, test.expectedError) {
-				t.Fatalf("expected %v got %v", test.expectedError, err)
-			}
-		})
-	}
-}
-
-func TestFailOnStatusBetween(t *testing.T) {
-	ctx := context.Background()
-
 	someError := errors.New("some error")
 
 	tests := []struct {
 		testcase      string
 		statusCode    int
 		expectedError error
+		failManagers  client.FailManager
 	}{
+		// Tests StatusChecker
 		{
-			testcase:   "should not fail",
-			statusCode: http.StatusOK,
+			testcase:     "should not fail",
+			statusCode:   http.StatusOK,
+			failManagers: client.StatusChecker(someError, http.StatusInternalServerError),
 		},
 		{
-			testcase:   "should not fail on lower limit boundary",
-			statusCode: 399,
-		},
-		{
-			testcase:   "should not fail on upper limit boundary",
-			statusCode: 600,
-		},
-		{
-			testcase:      "should fail with an error",
+			testcase:      "should fail with a 500 error",
 			statusCode:    http.StatusInternalServerError,
 			expectedError: someError,
+			failManagers:  client.StatusChecker(someError, http.StatusInternalServerError),
+		},
+		{
+			testcase:      "should fail with a 400 error",
+			statusCode:    http.StatusBadRequest,
+			expectedError: someError,
+			failManagers:  client.StatusChecker(someError, http.StatusBadRequest),
+		},
+		// Tests StatusBetween
+		{
+			testcase:     "should not fail",
+			statusCode:   http.StatusOK,
+			failManagers: client.StatusBetween(someError, 400, 599),
+		},
+		{
+			testcase:      "should fail if the status is in between the boundaries",
+			statusCode:    http.StatusForbidden,
+			expectedError: someError,
+			failManagers:  client.StatusBetween(someError, 400, 599),
+		},
+		// Tests StatusIsNot
+		{
+			testcase:     "should not fail",
+			statusCode:   http.StatusOK,
+			failManagers: client.StatusIsNot(someError, http.StatusOK),
+		},
+		{
+			testcase:      "should fail if the status is not 200",
+			statusCode:    http.StatusCreated,
+			expectedError: someError,
+			failManagers:  client.StatusIsNot(someError, http.StatusOK),
 		},
 	}
 
@@ -174,8 +154,7 @@ func TestFailOnStatusBetween(t *testing.T) {
 
 			cli, _ := client.New()
 			_, err := cli.Get(ctx, server.URL,
-				client.FailOn(client.StatusBetween(someError, 400, 599)),
-			)
+				client.FailOn(test.failManagers))
 			if !errors.Is(err, test.expectedError) {
 				t.Fatalf("expected %v got %v", test.expectedError, err)
 			}
