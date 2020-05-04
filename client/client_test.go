@@ -135,6 +135,54 @@ func TestFailOnStatus(t *testing.T) {
 	}
 }
 
+func TestFailOnStatusBetween(t *testing.T) {
+	ctx := context.Background()
+
+	someError := errors.New("some error")
+
+	tests := []struct {
+		testcase      string
+		statusCode    int
+		expectedError error
+	}{
+		{
+			testcase:   "should not fail",
+			statusCode: http.StatusOK,
+		},
+		{
+			testcase:   "should not fail on lower limit boundary",
+			statusCode: 399,
+		},
+		{
+			testcase:   "should not fail on upper limit boundary",
+			statusCode: 600,
+		},
+		{
+			testcase:      "should fail with an error",
+			statusCode:    http.StatusInternalServerError,
+			expectedError: someError,
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		t.Run(test.testcase, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(test.statusCode)
+				}))
+
+			cli, _ := client.New()
+			_, err := cli.Get(ctx, server.URL,
+				client.FailOn(client.StatusBetween(someError, 400, 599)),
+			)
+			if !errors.Is(err, test.expectedError) {
+				t.Fatalf("expected %v got %v", test.expectedError, err)
+			}
+		})
+	}
+}
+
 func TestTimeout(t *testing.T) {
 	ctx := context.Background()
 	server := httptest.NewServer(http.HandlerFunc(
