@@ -3,6 +3,8 @@ package tracing
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"strings"
 	"sync"
 
 	"contrib.go.opencensus.io/exporter/jaeger"
@@ -82,13 +84,38 @@ func (o SpanOptions) spanLabel() string {
 	return fmt.Sprintf("%s::%s", o.Namespace, o.label)
 }
 
-// StartSpan creates a new span
+// StartSpan creates a new span (DEPRECATED : use Span instead)
 func StartSpan(ctx context.Context, label string, funcs ...func(*SpanOptions)) (context.Context, func()) {
+	fs := []func(*SpanOptions){Label(label)}
+	return Span(ctx, append(fs, funcs...)...)
+}
+
+func inferFunctionName() string {
+	pcs := make([]uintptr, 10)
+
+	// runtime.Callers returns the stack which is :
+	// 0: Callers
+	// 1: InferFunctionName
+	// 2: Span
+	// 3: the actual function we want to infer
+	n := runtime.Callers(0, pcs)
+	if n < 3 {
+		return ""
+	}
+
+	frames := runtime.CallersFrames(pcs[3:n])
+	frame, _ := frames.Next()
+	functionName := strings.SplitAfter(frame.Function, ".")
+	return functionName[len(functionName)-1:][0]
+}
+
+// Span creates a new tracing span.
+func Span(ctx context.Context, funcs ...func(*SpanOptions)) (context.Context, func()) {
 	if !tracingEnabled {
 		return ctx, func() {}
 	}
 
-	options := SpanOptions{label: label}
+	options := SpanOptions{label: inferFunctionName()}
 	for _, apply := range funcs {
 		apply(&options)
 	}
@@ -112,6 +139,13 @@ func StartSpan(ctx context.Context, label string, funcs ...func(*SpanOptions)) (
 
 	return ctx, func() {
 		span.End()
+	}
+}
+
+// Label overrides the default label of the span.
+func Label(label string) func(*SpanOptions) {
+	return func(o *SpanOptions) {
+		o.label = label
 	}
 }
 
