@@ -33,6 +33,26 @@ func New(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *z
 	return &l
 }
 
+// Info returns a logger with an info log level.
+func Info(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *zerolog.Event {
+	return New(ctx, funcs...).Info()
+}
+
+// Warn returns a logger with a warning log level.
+func Warn(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *zerolog.Event {
+	return New(ctx, funcs...).Warn()
+}
+
+// Error returns a logger with an error log level.
+func Error(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *zerolog.Event {
+	return New(ctx, funcs...).Error()
+}
+
+// Panic returns a logger with a panic log level.
+func Panic(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *zerolog.Event {
+	return New(ctx, funcs...).Panic()
+}
+
 // WithServiceName adds the service name to the logs.
 func WithServiceName() func(zerolog.Context) zerolog.Context {
 	return func(log zerolog.Context) zerolog.Context {
