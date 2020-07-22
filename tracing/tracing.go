@@ -48,11 +48,11 @@ func NewJaegerExporterSingleton(collectorEndpoint, serviceName string,
 			apply(&options)
 		}
 
-		exporter, err := jaeger.NewExporter(jaeger.Options{
+		exporter, exporterErr := jaeger.NewExporter(jaeger.Options{
 			CollectorEndpoint: options.collectorEndpoint,
 			ServiceName:       options.serviceName,
 		})
-		if err != nil {
+		if exporterErr != nil {
 			err = ErrUnableToSetupJaegerExporter
 			return
 		}
