@@ -103,6 +103,7 @@ func (c client) try(ctx context.Context, request Request, cancelFunc context.Can
 
 	for _, fm := range request.failManagers {
 		if err := fm.Check(resp); err != nil {
+			defer resp.Body.Close()
 			return Response{}, err
 		}
 	}
