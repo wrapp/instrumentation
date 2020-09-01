@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/wrapp/instrumentation/requestid"
+	"github.com/wrapp/instrumentation/sessionid"
 )
 
 var logger zerolog.Logger
@@ -26,6 +27,7 @@ func New(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *z
 
 	funcs = append(funcs, WithServiceName())
 	funcs = append(funcs, WithRequestID(ctx))
+	funcs = append(funcs, WithSessionID(ctx))
 	for _, apply := range funcs {
 		log = apply(log)
 	}
@@ -72,6 +74,17 @@ func WithRequestID(ctx context.Context) func(zerolog.Context) zerolog.Context {
 			return log
 		}
 		return log.Str("request_id", requestID)
+	}
+}
+
+// WithSessionID injects the session id in the logs.
+func WithSessionID(ctx context.Context) func(zerolog.Context) zerolog.Context {
+	return func(log zerolog.Context) zerolog.Context {
+		sessionID := sessionid.Get(ctx)
+		if sessionID == "" {
+			return log
+		}
+		return log.Str("session_id", sessionID)
 	}
 }
 
