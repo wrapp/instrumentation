@@ -10,11 +10,12 @@ type key string
 const (
 	// awsTraceIDKey used for the context-key
 	awsTraceIDKey key = "amazonTraceId"
-	// AWSTraceIDHeader is the httpHeader used for the aws-trace-id
+	// AWSTraceIDHeader is the httpHeader used for the tracing request through
+	// aws load-balancers
 	AWSTraceIDHeader = "X-Amzn-Trace-Id"
 )
 
-// Middleware injects the session in the context
+// Middleware injects the amazon-traceID in the context
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		awsTraceID := r.Header.Get(AWSTraceIDHeader)
@@ -33,7 +34,7 @@ func Store(parent context.Context, awsTraceID string) context.Context {
 	return context.WithValue(parent, awsTraceIDKey, awsTraceID)
 }
 
-// Get returns the request ID from the context.
+// Get returns the awsTraceID from the context.
 func Get(ctx context.Context) string {
 	v := ctx.Value(awsTraceIDKey)
 	if v == nil {
