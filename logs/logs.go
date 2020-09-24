@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/wrapp/instrumentation/awstraceid"
 	"github.com/wrapp/instrumentation/requestid"
 	"github.com/wrapp/instrumentation/sessionid"
 )
@@ -28,6 +29,7 @@ func New(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *z
 	funcs = append(funcs, WithServiceName())
 	funcs = append(funcs, WithRequestID(ctx))
 	funcs = append(funcs, WithSessionID(ctx))
+	funcs = append(funcs, WithAWSTraceID(ctx))
 	for _, apply := range funcs {
 		log = apply(log)
 	}
@@ -85,6 +87,17 @@ func WithSessionID(ctx context.Context) func(zerolog.Context) zerolog.Context {
 			return log
 		}
 		return log.Str("session_id", sessionID)
+	}
+}
+
+// WithAWSTraceID injects the aws-trace-id in the logs.
+func WithAWSTraceID(ctx context.Context) func(zerolog.Context) zerolog.Context {
+	return func(log zerolog.Context) zerolog.Context {
+		gotTraceID := awstraceid.Get(ctx)
+		if gotTraceID == "" {
+			return log
+		}
+		return log.Str("aws_trace_id", gotTraceID)
 	}
 }
 

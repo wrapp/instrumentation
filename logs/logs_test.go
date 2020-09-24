@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/wrapp/instrumentation/awstraceid"
 	"github.com/wrapp/instrumentation/logs"
 	"github.com/wrapp/instrumentation/requestid"
 	"github.com/wrapp/instrumentation/sessionid"
@@ -43,25 +44,27 @@ func TestMaskSSN(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	type log struct {
-		Level     string `json:"level"`
-		RequestID string `json:"request_id"`
-		SessionID string `json:"session_id"`
-		Service   string `json:"service"`
-		Msg       string `json:"msg"`
+		Level      string `json:"level"`
+		RequestID  string `json:"request_id"`
+		SessionID  string `json:"session_id"`
+		AWSTraceID string `json:"aws_trace_id"`
+		Service    string `json:"service"`
+		Msg        string `json:"msg"`
 	}
 
 	expected := log{
-		Level:     "info",
-		RequestID: "my-request-id",
-		SessionID: "my-session-id",
-		Service:   "my-service-name",
-		Msg:       "my-message",
+		Level:      "info",
+		RequestID:  "my-request-id",
+		SessionID:  "my-session-id",
+		AWSTraceID: "my-aws-trace-id",
+		Service:    "my-service-name",
+		Msg:        "my-message",
 	}
 
 	os.Setenv("SERVICE_NAME", expected.Service)
 	ctx := requestid.Store(context.Background(), expected.RequestID)
 	ctx = sessionid.Store(ctx, expected.SessionID)
-
+	ctx = awstraceid.Store(ctx, expected.AWSTraceID)
 	var out bytes.Buffer
 	logger := logs.New(ctx, logs.WithRequestID(ctx)).Output(&out)
 

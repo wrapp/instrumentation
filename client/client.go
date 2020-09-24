@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/wrapp/instrumentation/awstraceid"
 	"github.com/wrapp/instrumentation/requestid"
 	"go.opencensus.io/plugin/ochttp"
 )
@@ -128,6 +129,7 @@ func (c client) do(ctx context.Context, url, method string, funcs ...RequestOpti
 
 	// Applying "battery-included" options.
 	Header("X-Request-ID", requestid.Get(ctx))(&req)
+	Header(awstraceid.AWSTraceIDHeader, awstraceid.Get(ctx))(&req)
 	UserAgent(c.serviceName)(&req)
 
 	// Applying the "on-demand" options
