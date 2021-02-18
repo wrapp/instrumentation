@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-
-	"github.com/pkg/errors"
 )
 
 // FailManager is a failure handler.
@@ -81,15 +79,15 @@ func (checker validationErrorsChecker) Check(resp *http.Response) error {
 		resp.Body = ioutil.NopCloser(bytes.NewBuffer(bdy))
 	}(body)
 	if err != nil {
-		return errors.Wrap(checker.raiseErr, fmt.Sprintf("Failed to read body to check for validation errors: %w", err))
+		return fmt.Errorf("%s: %w", checker.raiseErr.Error(), fmt.Errorf("Failed to read body to check for validation errors: %w", err))
 	}
 	validationErrors, err := ParseValidationErrors(body)
 	if err != nil {
-		return errors.Wrap(checker.raiseErr, fmt.Sprintf("Falied to parse validation errors from response body: %w", err))
+		return fmt.Errorf("%s: %w", checker.raiseErr.Error(), fmt.Errorf("Falied to parse validation errors from response body: %w", err))
 	}
 	// In the case the validation result is valid.
 	if validationErrors.Valid {
 		return nil
 	}
-	return errors.Wrap(checker.raiseErr, validationErrors.Error())
+	return fmt.Errorf("%s: %w", checker.raiseErr.Error(), validationErrors)
 }

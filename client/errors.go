@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -53,7 +51,7 @@ func (ve ValidationErrors) Error() string {
 func ParseValidationErrors(body []byte) (ValidationErrors, error) {
 	var validationErrors ValidationErrors
 	if err := json.NewDecoder(bytes.NewBuffer(body)).Decode(&validationErrors); err != nil {
-		return ValidationErrors{}, errors.Wrap(err, "failed to parse validation errors")
+		return ValidationErrors{}, fmt.Errorf("Failed to parse validation errors: %w", err)
 	}
 	return validationErrors, nil
 }
