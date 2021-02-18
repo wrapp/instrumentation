@@ -91,5 +91,5 @@ func (checker validationErrorsChecker) Check(resp *http.Response) error {
 	if validationErrors.Valid {
 		return nil
 	}
-	return errors.Wrap(checker.raiseErr, fmt.Sprintf("%w", validationErrors))
+	return errors.Wrap(checker.raiseErr, validationErrors.Error())
 }
