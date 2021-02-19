@@ -47,6 +47,16 @@ func (ve ValidationErrors) Error() string {
 	return strings.TrimSpace(buff.String())
 }
 
+// Extensions provide a map of the error properties
+func (ve ValidationErrors) Extensions() map[string]interface{} {
+	m := map[string]interface{}{
+		"message": "Field validation",
+		"valid":   ve.Valid,
+		"fields":  ve.Errors,
+	}
+	return m
+}
+
 // ParseValidationErrors parses a byte array for validation errors
 func ParseValidationErrors(body []byte) (ValidationErrors, error) {
 	var validationErrors ValidationErrors
