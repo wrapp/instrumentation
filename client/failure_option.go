@@ -89,5 +89,5 @@ func (checker validationErrorsChecker) Check(resp *http.Response) error {
 	if validationErrors.Valid {
 		return nil
 	}
-	return fmt.Errorf("%s: %w", checker.raiseErr.Error(), validationErrors)
+	return validationErrors
 }
