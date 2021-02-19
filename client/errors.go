@@ -26,19 +26,20 @@ func (fe FieldError) Error() string {
 // ValidationErrors is an array of FieldError's
 // for use in custom error messages post validation.
 type ValidationErrors struct {
-	Valid  bool         `json:"valid"`
-	Errors []FieldError `json:"errors"`
+	Message string       `json:"message"`
+	Valid   bool         `json:"valid"`
+	Errors  []FieldError `json:"errors"`
 }
 
 // Error creates an error message from array of validation errors
 func (ve ValidationErrors) Error() string {
+	if ve.Message != "" {
+		return ve.Message
+	}
 
 	buff := bytes.NewBufferString("Validation Errors:\n")
-
 	var fe *FieldError
-
 	for i := 0; i < len(ve.Errors); i++ {
-
 		fe = &ve.Errors[i]
 		buff.WriteString(fe.Error())
 		buff.WriteString("\n")
@@ -50,7 +51,7 @@ func (ve ValidationErrors) Error() string {
 // Extensions provide a map of the error properties
 func (ve ValidationErrors) Extensions() map[string]interface{} {
 	m := map[string]interface{}{
-		"message": "Field validation",
+		"message": ve.Message,
 		"valid":   ve.Valid,
 		"fields":  ve.Errors,
 	}
@@ -58,10 +59,13 @@ func (ve ValidationErrors) Extensions() map[string]interface{} {
 }
 
 // ParseValidationErrors parses a byte array for validation errors
-func ParseValidationErrors(body []byte) (ValidationErrors, error) {
+func ParseValidationErrors(body []byte, message string) (ValidationErrors, error) {
 	var validationErrors ValidationErrors
 	if err := json.NewDecoder(bytes.NewBuffer(body)).Decode(&validationErrors); err != nil {
 		return ValidationErrors{}, fmt.Errorf("Failed to parse validation errors: %w", err)
+	}
+	if message != "" {
+		validationErrors.Message = message
 	}
 	return validationErrors, nil
 }

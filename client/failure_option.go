@@ -81,7 +81,7 @@ func (checker validationErrorsChecker) Check(resp *http.Response) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", checker.raiseErr.Error(), fmt.Errorf("Failed to read body to check for validation errors: %w", err))
 	}
-	validationErrors, err := ParseValidationErrors(body)
+	validationErrors, err := ParseValidationErrors(body, checker.raiseErr.Error())
 	if err != nil {
 		return fmt.Errorf("%s: %w", checker.raiseErr.Error(), fmt.Errorf("Falied to parse validation errors from response body: %w", err))
 	}
