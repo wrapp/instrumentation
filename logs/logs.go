@@ -47,6 +47,11 @@ func Warn(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *
 	return New(ctx, funcs...).Warn()
 }
 
+// Debug returns a logger with an debug log level.
+func Debug(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *zerolog.Event {
+	return New(ctx, funcs...).Debug()
+}
+
 // Error returns a logger with an error log level.
 func Error(ctx context.Context, funcs ...func(zerolog.Context) zerolog.Context) *zerolog.Event {
 	return New(ctx, funcs...).Error()
