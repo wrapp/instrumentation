@@ -20,7 +20,7 @@ func badRequest(w http.ResponseWriter, r *http.Request, message, err string) {
 		Error   string `json:"error,omitempty"`
 	}
 
-	json.NewEncoder(w).Encode(response{
+	_ = json.NewEncoder(w).Encode(response{
 		Message: message,
 		Error:   err,
 	})
