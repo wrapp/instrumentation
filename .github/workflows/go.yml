@@ -26,28 +26,20 @@ jobs:
           go-version: '>=1.19.0'
       - name: Vet
         run: |
-          go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
           go vet ./...
 
-  fmt:
-    name: Check formatting
+  staticcheck:
+    name: Static check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
           go-version: '>=1.19.0'
-      - name: Formatting
-        run: |
-          go install golang.org/x/tools/cmd/goimports
-          GOFMT_OUTPUT="$(goimports -l . 2>&1)"
-          if [ -n "$GOFMT_OUTPUT" ]; then
-            echo "All the following files are not correctly formatted"
-            echo "${GOFMT_OUTPUT}"
-
-            exit 1
-          fi
-          echo "::set-output name=gofmt-output::Gofmt step succeed"
+      - uses: dominikh/staticcheck-action@v1.2.0
+        with:
+          version: "2022.1"
+          install-go: false
 
   test:
     name: Test
@@ -59,4 +51,15 @@ jobs:
           go-version: '>=1.19.0'
       - name: Test
         run: go test -v -race ./...
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.19.0'
+      - name: Build
+        run: go build -v ./...
 
