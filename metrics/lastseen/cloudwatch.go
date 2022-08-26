@@ -37,17 +37,17 @@ func (t *cloudWatchExporter) Export(ctx context.Context, field string, val LastS
 	_, err := t.cloudwatch.PutMetricData(&cloudwatch.PutMetricDataInput{
 		Namespace: aws.String(t.namespace),
 		MetricData: []*cloudwatch.MetricDatum{
-			&cloudwatch.MetricDatum{
+			{
 				Timestamp:  aws.Time(time.Unix(val.Value, 0)),
 				MetricName: aws.String("LastSeen"),
 				Unit:       aws.String(cloudwatch.StandardUnitNone),
 				Value:      aws.Float64(1),
 				Dimensions: []*cloudwatch.Dimension{
-					&cloudwatch.Dimension{
+					{
 						Name:  aws.String("ServiceName"),
 						Value: aws.String(t.serviceName),
 					},
-					&cloudwatch.Dimension{
+					{
 						Name:  aws.String("Action"),
 						Value: aws.String(field),
 					},

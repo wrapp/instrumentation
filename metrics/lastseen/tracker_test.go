@@ -13,11 +13,6 @@ type TrackerTestSuite struct {
 	suite.Suite
 }
 
-type trackerTest struct {
-	description string
-	expect      bool
-}
-
 type testExporter struct {
 	mock.Mock
 }
