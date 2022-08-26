@@ -105,7 +105,7 @@ func (c client) try(ctx context.Context, request Request, cancelFunc context.Can
 
 	for _, fm := range request.failManagers {
 		if err := fm.Check(resp); err != nil {
-			io.Copy(ioutil.Discard, resp.Body)
+			_, _ = io.Copy(ioutil.Discard, resp.Body)
 			resp.Body.Close()
 			return Response{}, err
 		}
@@ -128,9 +128,15 @@ func (c client) do(ctx context.Context, url, method string, funcs ...RequestOpti
 	}
 
 	// Applying "battery-included" options.
-	Header("X-Request-ID", requestid.Get(ctx))(&req)
-	Header(awstraceid.AWSTraceIDHeader, awstraceid.Get(ctx))(&req)
-	UserAgent(c.serviceName)(&req)
+	for _, included := range []RequestOption{
+		Header("X-Request-ID", requestid.Get(ctx)),
+		Header(awstraceid.AWSTraceIDHeader, awstraceid.Get(ctx)),
+		UserAgent(c.serviceName),
+	} {
+		if err := included(&req); err != nil {
+			return Response{}, err
+		}
+	}
 
 	// Applying the "on-demand" options
 	for _, apply := range funcs {

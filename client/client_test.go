@@ -37,7 +37,7 @@ func TestSimple(t *testing.T) {
 			if requestID != "request-id" {
 				t.Fatalf("expected request-id 'request-id', got %s", requestID)
 			}
-			json.NewEncoder(w).Encode(expected)
+			_ = json.NewEncoder(w).Encode(expected)
 		}))
 	ctx = requestid.Store(ctx, "request-id")
 	os.Setenv("SERVICE_NAME", expectedUserAgent)
@@ -213,7 +213,7 @@ func TestRetries(t *testing.T) {
 				}))
 
 			cli, _ := client.New()
-			cli.Delete(ctx, server.URL,
+			_, _ = cli.Delete(ctx, server.URL,
 				client.FailOn(client.StatusChecker(errors.New("oops"), http.StatusInternalServerError)),
 				client.Retry(test.retries),
 			)
@@ -257,18 +257,18 @@ func TestRetryWithBackoff(t *testing.T) {
 	}
 
 	tests := []test{
-		test{
+		{
 			testcase:        "no backoff should be really quick",
 			backoff:         0 * time.Millisecond,
 			expectedRetries: uint(3),
 		},
-		test{
+		{
 			testcase:            "50ms backoff with 3 retries should be at least 200ms",
 			backoff:             50 * time.Millisecond,
 			expectedRetries:     uint(3),
 			expectedMinDuration: 200 * time.Millisecond,
 		},
-		test{
+		{
 			testcase:            "50ms backoff with 4 retries should be at least 550ms",
 			backoff:             50 * time.Millisecond,
 			expectedRetries:     uint(4),
@@ -288,7 +288,7 @@ func TestRetryWithBackoff(t *testing.T) {
 
 			start := time.Now().UTC()
 			cli, _ := client.New()
-			cli.Post(ctx, server.URL,
+			_, _ = cli.Post(ctx, server.URL,
 				client.FailOn(client.StatusChecker(errors.New("oops"),
 					http.StatusInternalServerError)),
 				client.RetryWithBackoff(test.expectedRetries, test.backoff),
