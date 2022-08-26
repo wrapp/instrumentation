@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -69,7 +69,7 @@ func TestBody(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			b, _ := ioutil.ReadAll(r.Body)
+			b, _ := io.ReadAll(r.Body)
 			if !bytes.Equal(b, buffer) {
 				t.Fatalf("expected %s got %s", string(buffer), string(b))
 			}

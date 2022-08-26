@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/wrapp/instrumentation/logs"
@@ -28,7 +27,7 @@ func badRequest(w http.ResponseWriter, r *http.Request, message, err string) {
 
 // Middleware checks whether the request payload validates a given schema.
 func Middleware(r io.Reader) func(next http.Handler) http.Handler {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		logs.New(context.Background()).
 			Panic().
@@ -47,7 +46,7 @@ func Middleware(r io.Reader) func(next http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			buffer, err := ioutil.ReadAll(r.Body)
+			buffer, err := io.ReadAll(r.Body)
 			if err != nil {
 				badRequest(w, r, "no payload", err.Error())
 				return
@@ -66,7 +65,7 @@ func Middleware(r io.Reader) func(next http.Handler) http.Handler {
 			}
 
 			// we need to reinject the body because it has been consumed previously
-			r.Body = ioutil.NopCloser(bytes.NewBuffer(buffer))
+			r.Body = io.NopCloser(bytes.NewBuffer(buffer))
 			next.ServeHTTP(w, r)
 		})
 	}

@@ -3,7 +3,7 @@ package client
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -73,17 +73,17 @@ func (checker validationErrorsChecker) Check(resp *http.Response) error {
 		return nil
 	}
 	// Retrieve the body
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	defer func(bdy []byte) {
 		// reinject the body because it has been consumed previously, in case someone wants to use it.
-		resp.Body = ioutil.NopCloser(bytes.NewBuffer(bdy))
+		resp.Body = io.NopCloser(bytes.NewBuffer(bdy))
 	}(body)
 	if err != nil {
-		return fmt.Errorf("%s: %w", checker.raiseErr.Error(), fmt.Errorf("Failed to read body to check for validation errors: %w", err))
+		return fmt.Errorf("%s: %w", checker.raiseErr.Error(), fmt.Errorf("failed to read body to check for validation errors: %w", err))
 	}
 	validationErrors, err := ParseValidationErrors(body, checker.raiseErr.Error())
 	if err != nil {
-		return fmt.Errorf("%s: %w", checker.raiseErr.Error(), fmt.Errorf("Falied to parse validation errors from response body: %w", err))
+		return fmt.Errorf("%s: %w", checker.raiseErr.Error(), fmt.Errorf("falied to parse validation errors from response body: %w", err))
 	}
 	// In the case the validation result is valid.
 	if validationErrors.Valid {

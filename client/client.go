@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"os"
@@ -105,7 +104,7 @@ func (c client) try(ctx context.Context, request Request, cancelFunc context.Can
 
 	for _, fm := range request.failManagers {
 		if err := fm.Check(resp); err != nil {
-			_, _ = io.Copy(ioutil.Discard, resp.Body)
+			_, _ = io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 			return Response{}, err
 		}
