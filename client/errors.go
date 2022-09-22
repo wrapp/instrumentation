@@ -62,7 +62,7 @@ func (ve ValidationErrors) Extensions() map[string]interface{} {
 func ParseValidationErrors(body []byte, message string) (ValidationErrors, error) {
 	var validationErrors ValidationErrors
 	if err := json.NewDecoder(bytes.NewBuffer(body)).Decode(&validationErrors); err != nil {
-		return ValidationErrors{}, fmt.Errorf("Failed to parse validation errors: %w", err)
+		return ValidationErrors{}, fmt.Errorf("failed to parse validation errors: %w", err)
 	}
 	if message != "" {
 		validationErrors.Message = message
